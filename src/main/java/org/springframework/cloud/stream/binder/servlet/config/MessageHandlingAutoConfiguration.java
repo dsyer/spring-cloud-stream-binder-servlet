@@ -16,34 +16,31 @@
 
 package org.springframework.cloud.stream.binder.servlet.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.autoconfigure.AutoConfigureBefore;
+import org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration;
+import org.springframework.cloud.stream.binder.servlet.EnabledBindings;
 import org.springframework.cloud.stream.binder.servlet.MessageController;
-import org.springframework.cloud.stream.binder.servlet.ServletMessageChannelBinder;
-import org.springframework.cloud.stream.config.codec.kryo.KryoCodecAutoConfiguration;
+import org.springframework.cloud.stream.config.BindingServiceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import org.springframework.integration.codec.Codec;
 
 /**
  * @author Dave Syer
  */
 @Configuration
-@Import({ PropertyPlaceholderAutoConfiguration.class, KryoCodecAutoConfiguration.class })
-public class ServletMessageChannelBinderConfiguration {
-
-	@Autowired
-	private Codec codec;
+@AutoConfigureBefore({ WebMvcAutoConfiguration.class })
+public class MessageHandlingAutoConfiguration {
 
 	@Bean
-	public ServletMessageChannelBinder servletMessageChannelBinder(
-			MessageController controller) {
-
-		ServletMessageChannelBinder messageChannelBinder = new ServletMessageChannelBinder(
-				controller);
-		messageChannelBinder.setCodec(this.codec);
-		return messageChannelBinder;
+	public MessageController messageController(EnabledBindings bindings) {
+		return new MessageController(bindings);
 	}
 
+	@Bean
+	public BeanFactoryEnabledBindings enabledBindings(
+			ConfigurableListableBeanFactory beanFactory,
+			BindingServiceProperties binding) {
+		return new BeanFactoryEnabledBindings(beanFactory, binding);
+	}
 }

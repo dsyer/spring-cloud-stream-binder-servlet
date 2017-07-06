@@ -29,6 +29,7 @@ import org.springframework.cloud.stream.annotation.Input;
 import org.springframework.cloud.stream.annotation.Output;
 import org.springframework.cloud.stream.binder.servlet.EnabledBindings;
 import org.springframework.cloud.stream.binding.BindingBeanDefinitionRegistryUtils;
+import org.springframework.cloud.stream.config.BindingServiceProperties;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.MultiValueMap;
@@ -45,9 +46,12 @@ public class BeanFactoryEnabledBindings implements EnabledBindings {
 	private final Map<String, String> outputsToInputs = new HashMap<>();
 	private final Set<String> outputs = new HashSet<>();
 	private final Set<String> inputs = new HashSet<>();
+	private final BindingServiceProperties binding;
 
-	public BeanFactoryEnabledBindings(ConfigurableListableBeanFactory beanFactory) {
+	public BeanFactoryEnabledBindings(ConfigurableListableBeanFactory beanFactory,
+			BindingServiceProperties binding) {
 		this.beanFactory = beanFactory;
+		this.binding = binding;
 	}
 
 	@Override
@@ -90,12 +94,14 @@ public class BeanFactoryEnabledBindings implements EnabledBindings {
 								if (input != null) {
 									String name = BindingBeanDefinitionRegistryUtils
 											.getBindingTargetName(input, method);
-									inputs.add(name);
+									inputs.add(BeanFactoryEnabledBindings.this.binding
+											.getBindingDestination(name));
 								}
 								if (output != null) {
 									String name = BindingBeanDefinitionRegistryUtils
 											.getBindingTargetName(output, method);
-									outputs.add(name);
+									outputs.add(BeanFactoryEnabledBindings.this.binding
+											.getBindingDestination(name));
 								}
 							});
 							BeanFactoryEnabledBindings.this.outputs.addAll(outputs);

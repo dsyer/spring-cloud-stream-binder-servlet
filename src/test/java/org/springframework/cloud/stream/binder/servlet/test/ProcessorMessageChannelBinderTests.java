@@ -13,23 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.springframework.cloud.stream.binder.servlet;
+package org.springframework.cloud.stream.binder.servlet.test;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.stream.annotation.EnableBinding;
-import org.springframework.cloud.stream.messaging.Source;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.cloud.stream.messaging.Processor;
+import org.springframework.http.MediaType;
+import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,35 +45,51 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @SpringBootTest
 @AutoConfigureMockMvc
-public class SourceMessageChannelBinderTests {
+public class ProcessorMessageChannelBinderTests {
 
 	@Autowired
-	private Source source;
+	private Processor processor;
 
 	@Autowired
 	private MockMvc mockMvc;
 
 	@Test
 	public void supplier() throws Exception {
-		source.output().send(MessageBuilder.withPayload("hello").build());
+		processor.output().send(MessageBuilder.withPayload("hello").build());
 		mockMvc.perform(get("/stream/output")).andExpect(status().isOk())
 				.andExpect(content().string(containsString("hello")));
 	}
 
 	@Test
-	public void empty() throws Exception {
-		mockMvc.perform(get("/stream/output")).andExpect(status().isOk())
-				.andExpect(content().string(containsString("[]")));
+	public void function() throws Exception {
+		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
+				.content("\"hello\"")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("HELLO")));
 	}
 
 	@Test
-	public void missing() throws Exception {
-		mockMvc.perform(get("/stream/missing")).andExpect(status().isNotFound());
+	public void string() throws Exception {
+		mockMvc.perform(
+				post("/stream/input").contentType(MediaType.TEXT_PLAIN).content("hello"))
+				.andExpect(status().isOk())
+				.andExpect(content().string(containsString("HELLO")));
 	}
 
 	@SpringBootApplication
-	@EnableBinding(Source.class)
+	@EnableBinding(Processor.class)
 	protected static class TestConfiguration {
+		@StreamListener(Processor.INPUT)
+		@SendTo(Processor.OUTPUT)
+		public String uppercase(String input) {
+			return input.toUpperCase();
+		}
+
+		public static void main(String[] args) throws Exception {
+			SpringApplication.run(
+					ProcessorMessageChannelBinderTests.TestConfiguration.class,
+					"--logging.level.root=INFO");
+		}
+
 	}
 
 }
