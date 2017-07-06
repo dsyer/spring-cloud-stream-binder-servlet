@@ -26,10 +26,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.ObjectUtils;
@@ -37,6 +40,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -61,22 +65,23 @@ public class MessageController {
 	}
 
 	@GetMapping("/{path}")
-	public ResponseEntity<List<Object>> supplier(@PathVariable String path) {
+	public ResponseEntity<Collection<Object>> supplier(@PathVariable String path,
+			@RequestHeader HttpHeaders headers) {
 		if (!bindings.getOutputs().contains(path)) {
 			return ResponseEntity.notFound().build();
 		}
-		return ResponseEntity.ok(poll(path));
+		return convert(poll(path), headers);
 	}
 
 	@PostMapping(path = "/{path}", consumes = MediaType.TEXT_PLAIN_VALUE)
 	public ResponseEntity<Collection<Object>> string(@PathVariable String path,
-			@RequestBody String body) {
-		return consumer(path, body);
+			@RequestBody String body, @RequestHeader HttpHeaders headers) {
+		return consumer(path, body, headers);
 	}
 
 	@PostMapping("/{path}")
 	public ResponseEntity<Collection<Object>> consumer(@PathVariable String path,
-			@RequestBody Object body) {
+			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
 		if (!bindings.getInputs().contains(path)) {
 			return ResponseEntity.notFound().build();
 		}
@@ -94,16 +99,32 @@ public class MessageController {
 				collection = Arrays.asList(body);
 			}
 		}
+		MessageHeaders messageHeaders = HeaderUtils.fromHttp(headers);
 		for (Object payload : collection) {
-			input.send(MessageBuilder.withPayload(payload).build());
+			input.send(MessageBuilder.withPayload(payload)
+					.copyHeadersIfAbsent(messageHeaders).build());
 		}
 		if (this.outputs.containsKey(path)) {
-			return ResponseEntity.ok().body(poll(outputs.get(path)));
+			Message<Collection<Object>> content = poll(outputs.get(path));
+			return convert(content, headers);
 		}
-		return ResponseEntity.accepted().body(collection);
+		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(collection)
+				.copyHeadersIfAbsent(messageHeaders).build(), headers);
 	}
 
-	private List<Object> poll(String path) {
+	private ResponseEntity<Collection<Object>> convert(
+			Message<Collection<Object>> message, HttpHeaders request) {
+		return convert(HttpStatus.OK, message, request);
+	}
+
+	private ResponseEntity<Collection<Object>> convert(HttpStatus status,
+			Message<Collection<Object>> message, HttpHeaders request) {
+		return ResponseEntity.status(status)
+				.headers(HeaderUtils.fromMessage(message.getHeaders(), request))
+				.body(message.getPayload());
+	}
+
+	private Message<Collection<Object>> poll(String path) {
 		List<Object> list = new ArrayList<>();
 		List<Message<?>> messages = new ArrayList<>();
 		BlockingQueue<Message<?>> queue = queues.get(path);
@@ -113,7 +134,11 @@ public class MessageController {
 				list.add(message.getPayload());
 			}
 		}
-		return list;
+		MessageBuilder<Collection<Object>> builder = MessageBuilder.withPayload(list);
+		if (!messages.isEmpty()) {
+			builder.copyHeadersIfAbsent(messages.get(0).getHeaders());
+		}
+		return builder.build();
 	}
 
 	public void subscribe(String name, SubscribableChannel outboundBindTarget) {
