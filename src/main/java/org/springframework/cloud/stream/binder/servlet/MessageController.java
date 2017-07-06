@@ -65,7 +65,7 @@ public class MessageController {
 	}
 
 	@GetMapping("/{path}")
-	public ResponseEntity<Collection<Object>> supplier(@PathVariable String path,
+	public ResponseEntity<Object> supplier(@PathVariable String path,
 			@RequestHeader HttpHeaders headers) {
 		if (!bindings.getOutputs().contains(path)) {
 			return ResponseEntity.notFound().build();
@@ -74,18 +74,19 @@ public class MessageController {
 	}
 
 	@PostMapping(path = "/{path}", consumes = MediaType.TEXT_PLAIN_VALUE)
-	public ResponseEntity<Collection<Object>> string(@PathVariable String path,
+	public ResponseEntity<Object> string(@PathVariable String path,
 			@RequestBody String body, @RequestHeader HttpHeaders headers) {
 		return consumer(path, body, headers);
 	}
 
 	@PostMapping("/{path}")
-	public ResponseEntity<Collection<Object>> consumer(@PathVariable String path,
+	public ResponseEntity<Object> consumer(@PathVariable String path,
 			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
 		if (!bindings.getInputs().contains(path)) {
 			return ResponseEntity.notFound().build();
 		}
 		Collection<Object> collection;
+		boolean single = false;
 		if (body instanceof Collection) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> list = (Collection<Object>) body;
@@ -96,6 +97,7 @@ public class MessageController {
 				collection = Arrays.asList(ObjectUtils.toObjectArray(body));
 			}
 			else {
+				single = true;
 				collection = Arrays.asList(body);
 			}
 		}
@@ -106,19 +108,23 @@ public class MessageController {
 		}
 		if (this.outputs.containsKey(path)) {
 			Message<Collection<Object>> content = poll(outputs.get(path));
-			return convert(content, headers);
+			Message<?> output = content;
+			if (single && content.getPayload().size() == 1) {
+				output = MessageBuilder.createMessage(
+						content.getPayload().iterator().next(), content.getHeaders());
+			}
+			return convert(output, headers);
 		}
-		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(collection)
+		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(body)
 				.copyHeadersIfAbsent(messageHeaders).build(), headers);
 	}
 
-	private ResponseEntity<Collection<Object>> convert(
-			Message<Collection<Object>> message, HttpHeaders request) {
+	private ResponseEntity<Object> convert(Message<?> message, HttpHeaders request) {
 		return convert(HttpStatus.OK, message, request);
 	}
 
-	private ResponseEntity<Collection<Object>> convert(HttpStatus status,
-			Message<Collection<Object>> message, HttpHeaders request) {
+	private ResponseEntity<Object> convert(HttpStatus status, Message<?> message,
+			HttpHeaders request) {
 		return ResponseEntity.status(status)
 				.headers(HeaderUtils.fromMessage(message.getHeaders(), request))
 				.body(message.getPayload());

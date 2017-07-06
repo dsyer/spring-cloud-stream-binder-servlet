@@ -32,6 +32,7 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -71,8 +72,7 @@ public class ProcessorMessageChannelBinderTests {
 	public void string() throws Exception {
 		mockMvc.perform(
 				post("/stream/input").contentType(MediaType.TEXT_PLAIN).content("hello"))
-				.andExpect(status().isOk())
-				.andExpect(content().string(containsString("HELLO")));
+				.andExpect(status().isOk()).andExpect(content().string(equalTo("HELLO")));
 	}
 
 	@SpringBootApplication
