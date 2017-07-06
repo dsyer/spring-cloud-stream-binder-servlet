@@ -17,8 +17,10 @@ package org.springframework.cloud.stream.binder.servlet.config;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -38,18 +40,32 @@ import org.springframework.util.ReflectionUtils;
  */
 public class BeanFactoryEnabledBindings implements EnabledBindings {
 
-	private ConfigurableListableBeanFactory beanFactory;
-	private AtomicBoolean initialized = new AtomicBoolean(false);
-	private Map<String, String> inputs = new HashMap<>();
+	private final ConfigurableListableBeanFactory beanFactory;
+	private final AtomicBoolean initialized = new AtomicBoolean(false);
+	private final Map<String, String> outputsToInputs = new HashMap<>();
+	private final Set<String> outputs = new HashSet<>();
+	private final Set<String> inputs = new HashSet<>();
 
 	public BeanFactoryEnabledBindings(ConfigurableListableBeanFactory beanFactory) {
 		this.beanFactory = beanFactory;
 	}
 
 	@Override
+	public Set<String> getInputs() {
+		init();
+		return this.inputs;
+	}
+
+	@Override
+	public Set<String> getOutputs() {
+		init();
+		return this.outputs;
+	}
+
+	@Override
 	public String getInput(String output) {
 		init();
-		return inputs.get(output);
+		return outputsToInputs.get(output);
 	}
 
 	private void init() {
@@ -82,9 +98,11 @@ public class BeanFactoryEnabledBindings implements EnabledBindings {
 									outputs.add(name);
 								}
 							});
+							BeanFactoryEnabledBindings.this.outputs.addAll(outputs);
+							BeanFactoryEnabledBindings.this.inputs.addAll(inputs);
 							if (inputs.size() == 1 && outputs.size() == 1) {
-								BeanFactoryEnabledBindings.this.inputs.put(outputs.get(0),
-										inputs.get(0));
+								BeanFactoryEnabledBindings.this.outputsToInputs
+										.put(outputs.get(0), inputs.get(0));
 							}
 						}
 					}

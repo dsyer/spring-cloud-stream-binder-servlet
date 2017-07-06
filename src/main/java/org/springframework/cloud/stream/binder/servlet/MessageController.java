@@ -62,6 +62,9 @@ public class MessageController {
 
 	@GetMapping("/{path}")
 	public ResponseEntity<List<Object>> supplier(@PathVariable String path) {
+		if (!bindings.getOutputs().contains(path)) {
+			return ResponseEntity.notFound().build();
+		}
 		return ResponseEntity.ok(poll(path));
 	}
 
@@ -74,6 +77,9 @@ public class MessageController {
 	@PostMapping("/{path}")
 	public ResponseEntity<Collection<Object>> consumer(@PathVariable String path,
 			@RequestBody Object body) {
+		if (!bindings.getInputs().contains(path)) {
+			return ResponseEntity.notFound().build();
+		}
 		Collection<Object> collection;
 		if (body instanceof Collection) {
 			@SuppressWarnings("unchecked")

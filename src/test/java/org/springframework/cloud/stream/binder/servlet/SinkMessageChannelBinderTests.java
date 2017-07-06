@@ -75,6 +75,12 @@ public class SinkMessageChannelBinderTests implements MessageHandler {
 		sink.input().unsubscribe(this);
 	}
 
+	@Test
+	public void missing() throws Exception {
+		mockMvc.perform(post("/stream/missing").contentType(MediaType.TEXT_PLAIN)
+				.content("hello")).andExpect(status().isNotFound());
+	}
+
 	@SpringBootApplication
 	@EnableBinding(Sink.class)
 	protected static class TestConfiguration {

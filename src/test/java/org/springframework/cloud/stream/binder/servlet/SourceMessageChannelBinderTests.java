@@ -55,6 +55,17 @@ public class SourceMessageChannelBinderTests {
 				.andExpect(content().string(containsString("hello")));
 	}
 
+	@Test
+	public void empty() throws Exception {
+		mockMvc.perform(get("/stream/output")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("[]")));
+	}
+
+	@Test
+	public void missing() throws Exception {
+		mockMvc.perform(get("/stream/missing")).andExpect(status().isNotFound());
+	}
+
 	@SpringBootApplication
 	@EnableBinding(Source.class)
 	protected static class TestConfiguration {

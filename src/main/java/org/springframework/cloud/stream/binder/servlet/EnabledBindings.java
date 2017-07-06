@@ -15,6 +15,8 @@
  */
 package org.springframework.cloud.stream.binder.servlet;
 
+import java.util.Set;
+
 /**
  * @author Dave Syer
  *
@@ -22,5 +24,9 @@ package org.springframework.cloud.stream.binder.servlet;
 public interface EnabledBindings {
 
 	String getInput(String output);
+
+	Set<String> getOutputs();
+
+	Set<String> getInputs();
 
 }
