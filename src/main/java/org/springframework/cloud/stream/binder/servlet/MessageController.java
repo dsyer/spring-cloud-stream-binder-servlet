@@ -54,7 +54,7 @@ public class MessageController {
 
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
 
-	private MessageChannel input;
+	private Map<String, MessageChannel> inputs = new HashMap<>();
 
 	private Map<String, String> outputs = new HashMap<>();
 
@@ -82,7 +82,7 @@ public class MessageController {
 	@PostMapping("/{path}")
 	public ResponseEntity<Object> consumer(@PathVariable String path,
 			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
-		if (!bindings.getInputs().contains(path)) {
+		if (!inputs.containsKey(path)) {
 			return ResponseEntity.notFound().build();
 		}
 		Collection<Object> collection;
@@ -102,6 +102,7 @@ public class MessageController {
 			}
 		}
 		MessageHeaders messageHeaders = HeaderUtils.fromHttp(headers);
+		MessageChannel input = inputs.get(path);
 		for (Object payload : collection) {
 			input.send(MessageBuilder.withPayload(payload)
 					.copyHeadersIfAbsent(messageHeaders).build());
@@ -160,7 +161,7 @@ public class MessageController {
 	}
 
 	public void bind(String name, String group, MessageChannel inputTarget) {
-		this.input = inputTarget;
+		this.inputs.put(name, inputTarget);
 	}
 
 }
