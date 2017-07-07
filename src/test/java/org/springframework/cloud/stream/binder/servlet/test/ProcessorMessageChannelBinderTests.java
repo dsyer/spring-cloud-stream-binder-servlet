@@ -77,6 +77,13 @@ public class ProcessorMessageChannelBinderTests {
 				.andExpect(status().isOk()).andExpect(content().string(equalTo("HELLO")));
 	}
 
+	@Test
+	public void multi() throws Exception {
+		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
+				.content("[\"hello\",\"world\"]")).andExpect(status().isOk())
+				.andExpect(content().string("[\"HELLO\",\"WORLD\"]"));
+	}
+
 	@SpringBootApplication
 	@EnableBinding(Processor.class)
 	protected static class TestConfiguration {
