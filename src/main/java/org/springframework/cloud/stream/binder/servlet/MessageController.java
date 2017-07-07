@@ -37,8 +37,8 @@ import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,29 +63,40 @@ public class MessageController {
 	private String prefix;
 
 	public MessageController(String prefix, EnabledBindings bindings) {
+		if (!prefix.startsWith("/")) {
+			prefix = "/" + prefix;
+		}
+		if (!prefix.endsWith("/")) {
+			prefix = prefix + "/";
+		}
 		this.prefix = prefix;
 		this.bindings = bindings;
 	}
 
-	@GetMapping("/{path}")
-	public ResponseEntity<Object> supplier(@PathVariable String path,
+	@GetMapping("/**")
+	public ResponseEntity<Object> supplier(
+			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestHeader HttpHeaders headers) {
-		if (!bindings.getOutputs().contains(path)) {
+		String channel = path.substring(prefix.length());
+		if (!bindings.getOutputs().contains(channel)) {
 			return ResponseEntity.notFound().build();
 		}
-		return convert(poll(path), headers);
+		return convert(poll(channel), headers);
 	}
 
-	@PostMapping(path = "/{path}", consumes = MediaType.TEXT_PLAIN_VALUE)
-	public ResponseEntity<Object> string(@PathVariable String path,
+	@PostMapping(path = "/**", consumes = MediaType.TEXT_PLAIN_VALUE)
+	public ResponseEntity<Object> string(
+			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody String body, @RequestHeader HttpHeaders headers) {
 		return consumer(path, body, headers);
 	}
 
-	@PostMapping("/{path}")
-	public ResponseEntity<Object> consumer(@PathVariable String path,
+	@PostMapping("/**")
+	public ResponseEntity<Object> consumer(
+			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
-		if (!inputs.containsKey(path)) {
+		String channel = path.substring(prefix.length());
+		if (!inputs.containsKey(channel)) {
 			return ResponseEntity.notFound().build();
 		}
 		Collection<Object> collection;
@@ -105,13 +116,13 @@ public class MessageController {
 			}
 		}
 		MessageHeaders messageHeaders = HeaderUtils.fromHttp(headers);
-		MessageChannel input = inputs.get(path);
+		MessageChannel input = inputs.get(channel);
 		for (Object payload : collection) {
 			input.send(MessageBuilder.withPayload(payload)
 					.copyHeadersIfAbsent(messageHeaders).build());
 		}
-		if (this.outputs.containsKey(path)) {
-			Message<Collection<Object>> content = poll(outputs.get(path));
+		if (this.outputs.containsKey(channel)) {
+			Message<Collection<Object>> content = poll(outputs.get(channel));
 			Message<?> output = content;
 			if (single && content.getPayload().size() == 1) {
 				output = MessageBuilder.createMessage(
