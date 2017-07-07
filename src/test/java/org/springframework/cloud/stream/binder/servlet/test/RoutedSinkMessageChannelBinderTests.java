@@ -23,6 +23,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.stream.annotation.EnableBinding;
+import org.springframework.cloud.stream.binder.servlet.MessageController;
 import org.springframework.cloud.stream.messaging.Sink;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.Message;
@@ -43,10 +44,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest("spring.cloud.stream.binder.servlet.prefix:awesome")
+@SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext
-public class PrefixMessageChannelBinderTests implements MessageHandler {
+public class RoutedSinkMessageChannelBinderTests implements MessageHandler {
 
 	@Autowired
 	private Sink sink;
@@ -59,10 +60,13 @@ public class PrefixMessageChannelBinderTests implements MessageHandler {
 	@Test
 	public void consumer() throws Exception {
 		sink.input().subscribe(this);
-		mockMvc.perform(post("/awesome/input").contentType(MediaType.APPLICATION_JSON)
-				.content("\"hello\"")).andExpect(status().isAccepted())
+		mockMvc.perform(post("/stream/words/input")
+				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
+				.andExpect(status().isAccepted())
 				.andExpect(content().string(containsString("hello")));
 		assertThat(this.message).isNotNull();
+		assertThat(this.message.getHeaders().get(MessageController.ROUTE_KEY))
+				.isEqualTo("words");
 		sink.input().unsubscribe(this);
 	}
 

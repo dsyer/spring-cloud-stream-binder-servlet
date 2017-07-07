@@ -27,6 +27,7 @@ import org.springframework.cloud.stream.annotation.StreamListener;
 import org.springframework.cloud.stream.messaging.Processor;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -42,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @SpringBootTest("spring.cloud.stream.bindings.input.destination:words")
 @AutoConfigureMockMvc
+@DirtiesContext
 public class NamedProcessorMessageChannelBinderTests {
 
 	@Autowired

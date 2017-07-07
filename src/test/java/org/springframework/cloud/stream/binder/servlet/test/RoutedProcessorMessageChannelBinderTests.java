@@ -23,19 +23,21 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.stream.annotation.EnableBinding;
-import org.springframework.cloud.stream.messaging.Sink;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.cloud.stream.binder.servlet.MessageController;
+import org.springframework.cloud.stream.messaging.Processor;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHandler;
-import org.springframework.messaging.MessagingException;
+import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -43,37 +45,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest("spring.cloud.stream.binder.servlet.prefix:awesome")
+@SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext
-public class PrefixMessageChannelBinderTests implements MessageHandler {
-
-	@Autowired
-	private Sink sink;
+public class RoutedProcessorMessageChannelBinderTests {
 
 	@Autowired
 	private MockMvc mockMvc;
 
-	private Message<?> message;
-
 	@Test
-	public void consumer() throws Exception {
-		sink.input().subscribe(this);
-		mockMvc.perform(post("/awesome/input").contentType(MediaType.APPLICATION_JSON)
-				.content("\"hello\"")).andExpect(status().isAccepted())
-				.andExpect(content().string(containsString("hello")));
-		assertThat(this.message).isNotNull();
-		sink.input().unsubscribe(this);
+	public void function() throws Exception {
+		mockMvc.perform(post("/stream/words/input")
+				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
+				.andExpect(status().isOk())
+				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
+				.andExpect(content().string(containsString("HELLO")));
 	}
 
 	@SpringBootApplication
-	@EnableBinding(Sink.class)
+	@EnableBinding(Processor.class)
 	protected static class TestConfiguration {
-	}
-
-	@Override
-	public void handleMessage(Message<?> message) throws MessagingException {
-		this.message = message;
+		@StreamListener(Processor.INPUT)
+		@SendTo(Processor.OUTPUT)
+		public Message<String> uppercase(Message<String> input) {
+			return MessageBuilder.withPayload(input.getPayload().toUpperCase())
+					.copyHeadersIfAbsent(input.getHeaders()).build();
+		}
 	}
 
 }

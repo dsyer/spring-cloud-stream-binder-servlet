@@ -32,7 +32,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.ObjectUtils;
@@ -52,6 +51,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/${spring.cloud.stream.binder.servlet.prefix:stream}")
 public class MessageController {
 
+	// TODO: naming convention for "public" keys
+	public static final String ROUTE_KEY = "STREAM_ROUTE_KEY";
+
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
 
 	private Map<String, MessageChannel> inputs = new HashMap<>();
@@ -61,6 +63,8 @@ public class MessageController {
 	private EnabledBindings bindings;
 
 	private String prefix;
+
+	private ThreadLocal<Route> threadLocalRoute = new ThreadLocal<>();
 
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
@@ -77,11 +81,12 @@ public class MessageController {
 	public ResponseEntity<Object> supplier(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestHeader HttpHeaders headers) {
-		String channel = path.substring(prefix.length());
+		Route route = new Route(path);
+		String channel = route.getChannel();
 		if (!bindings.getOutputs().contains(channel)) {
 			return ResponseEntity.notFound().build();
 		}
-		return convert(poll(channel), headers);
+		return convert(poll(channel, route.getKey()), headers);
 	}
 
 	@PostMapping(path = "/**", consumes = MediaType.TEXT_PLAIN_VALUE)
@@ -95,7 +100,8 @@ public class MessageController {
 	public ResponseEntity<Object> consumer(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
-		String channel = path.substring(prefix.length());
+		Route route = new Route(path);
+		String channel = route.getChannel();
 		if (!inputs.containsKey(channel)) {
 			return ResponseEntity.notFound().build();
 		}
@@ -115,20 +121,32 @@ public class MessageController {
 				collection = Arrays.asList(body);
 			}
 		}
-		MessageHeaders messageHeaders = HeaderUtils.fromHttp(headers);
+		Map<String, Object> messageHeaders = new HashMap<>(HeaderUtils.fromHttp(headers));
+		if (route.getKey() != null) {
+			messageHeaders.put(ROUTE_KEY, route.getKey());
+		}
 		MessageChannel input = inputs.get(channel);
-		for (Object payload : collection) {
-			input.send(MessageBuilder.withPayload(payload)
-					.copyHeadersIfAbsent(messageHeaders).build());
+		threadLocalRoute.set(route);
+		try {
+			for (Object payload : collection) {
+				input.send(MessageBuilder.withPayload(payload)
+						.copyHeadersIfAbsent(messageHeaders).build());
+			}
+		}
+		finally {
+			threadLocalRoute.remove();
 		}
 		if (this.outputs.containsKey(channel)) {
-			Message<Collection<Object>> content = poll(outputs.get(channel));
-			Message<?> output = content;
-			if (single && content.getPayload().size() == 1) {
-				output = MessageBuilder.createMessage(
-						content.getPayload().iterator().next(), content.getHeaders());
+			Message<Collection<Object>> content = poll(outputs.get(channel),
+					route.getKey());
+			if (!content.getPayload().isEmpty()) {
+				Message<?> output = content;
+				if (single && content.getPayload().size() == 1) {
+					output = MessageBuilder.createMessage(
+							content.getPayload().iterator().next(), content.getHeaders());
+				}
+				return convert(output, headers);
 			}
-			return convert(output, headers);
 		}
 		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(body)
 				.copyHeadersIfAbsent(messageHeaders).build(), headers);
@@ -145,10 +163,10 @@ public class MessageController {
 				.body(message.getPayload());
 	}
 
-	private Message<Collection<Object>> poll(String path) {
+	private Message<Collection<Object>> poll(String path, String route) {
 		List<Object> list = new ArrayList<>();
 		List<Message<?>> messages = new ArrayList<>();
-		BlockingQueue<Message<?>> queue = queues.get(path);
+		BlockingQueue<Message<?>> queue = queues.get(new Route(route, path).getPath());
 		if (queue != null) {
 			queue.drainTo(messages);
 			for (Message<?> message : messages) {
@@ -168,14 +186,63 @@ public class MessageController {
 	}
 
 	private void append(String name, Message<?> message) {
-		if (!queues.containsKey(name)) {
-			queues.putIfAbsent(name, new LinkedBlockingQueue<>());
+		String incoming = (String) message.getHeaders().get(ROUTE_KEY);
+		String key = incoming;
+		if (key == null && threadLocalRoute.get() != null) {
+			// If we can rescue the header from thread local we will do it. It's a shame
+			// that the headers don't get propagated by default.
+			key = threadLocalRoute.get().getKey();
 		}
-		queues.get(name).add(message);
+		Route route = new Route(key, name);
+		String path = route.getPath();
+		if (!queues.containsKey(path)) {
+			queues.putIfAbsent(path, new LinkedBlockingQueue<>());
+		}
+		if (incoming == null && key != null) {
+			message = MessageBuilder.fromMessage(message).setHeader(ROUTE_KEY, key)
+					.build();
+		}
+		queues.get(path).add(message);
 	}
 
 	public void bind(String name, String group, MessageChannel inputTarget) {
 		this.inputs.put(name, inputTarget);
 	}
 
+	private class Route {
+		private String key;
+		private String channel;
+		private String path;
+
+		public Route(String path) {
+			String channel = path.substring(prefix.length());
+			String[] paths = channel.split("/");
+			String route = null;
+			if (paths.length > 1) {
+				channel = paths[paths.length - 1];
+				route = path.substring(prefix.length(),
+						path.length() - channel.length() - 1);
+			}
+			this.channel = channel;
+			this.key = route;
+		}
+
+		public Route(String key, String channel) {
+			this.key = key;
+			this.channel = channel;
+			this.path = key != null ? key + "/" + channel : channel;
+		}
+
+		public String getPath() {
+			return path;
+		}
+
+		public String getKey() {
+			return key;
+		}
+
+		public String getChannel() {
+			return channel;
+		}
+	}
 }

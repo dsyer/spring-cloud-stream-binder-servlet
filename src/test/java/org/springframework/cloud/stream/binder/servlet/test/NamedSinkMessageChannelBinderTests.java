@@ -28,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -42,8 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest("spring.cloud.stream.bindings.input.destination:words")
+@SpringBootTest
 @AutoConfigureMockMvc
+@DirtiesContext
 public class NamedSinkMessageChannelBinderTests implements MessageHandler {
 
 	@Autowired
@@ -57,7 +59,7 @@ public class NamedSinkMessageChannelBinderTests implements MessageHandler {
 	@Test
 	public void consumer() throws Exception {
 		sink.input().subscribe(this);
-		mockMvc.perform(post("/stream/words").contentType(MediaType.APPLICATION_JSON)
+		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
 				.content("\"hello\"")).andExpect(status().isAccepted())
 				.andExpect(content().string(containsString("hello")));
 		assertThat(this.message).isNotNull();
