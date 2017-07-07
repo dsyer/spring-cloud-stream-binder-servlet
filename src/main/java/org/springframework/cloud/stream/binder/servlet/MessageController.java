@@ -49,7 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  */
 @RestController
-@RequestMapping("/stream")
+@RequestMapping("/${spring.cloud.stream.binder.servlet.prefix:stream}")
 public class MessageController {
 
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
@@ -60,7 +60,10 @@ public class MessageController {
 
 	private EnabledBindings bindings;
 
-	public MessageController(EnabledBindings bindings) {
+	private String prefix;
+
+	public MessageController(String prefix, EnabledBindings bindings) {
+		this.prefix = prefix;
 		this.bindings = bindings;
 	}
 

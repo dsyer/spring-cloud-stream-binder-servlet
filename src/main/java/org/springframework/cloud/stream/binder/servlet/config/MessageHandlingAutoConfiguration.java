@@ -19,6 +19,7 @@ package org.springframework.cloud.stream.binder.servlet.config;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.stream.binder.servlet.EnabledBindings;
 import org.springframework.cloud.stream.binder.servlet.MessageController;
 import org.springframework.cloud.stream.config.BindingServiceProperties;
@@ -30,11 +31,25 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @AutoConfigureBefore({ WebMvcAutoConfiguration.class })
+@ConfigurationProperties("spring.cloud.stream.binder.servlet")
 public class MessageHandlingAutoConfiguration {
+
+	/**
+	 * The prefix for the HTTP endpoint.
+	 */
+	private String prefix = "stream";
+
+	public String getPrefix() {
+		return prefix;
+	}
+
+	public void setPrefix(String prefix) {
+		this.prefix = prefix;
+	}
 
 	@Bean
 	public MessageController messageController(EnabledBindings bindings) {
-		return new MessageController(bindings);
+		return new MessageController(prefix, bindings);
 	}
 
 	@Bean
