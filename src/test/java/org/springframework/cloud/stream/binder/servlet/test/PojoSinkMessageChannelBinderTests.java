@@ -33,7 +33,6 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -46,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext
-public class SinkMessageChannelBinderTests implements MessageHandler {
+public class PojoSinkMessageChannelBinderTests implements MessageHandler {
 
 	@Autowired
 	private Sink sink;
@@ -60,8 +59,8 @@ public class SinkMessageChannelBinderTests implements MessageHandler {
 	public void consumer() throws Exception {
 		sink.input().subscribe(this);
 		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
-				.content("\"hello\"")).andExpect(status().isAccepted())
-				.andExpect(content().string(containsString("hello")));
+				.content("{\"value\":\"hello\"}")).andExpect(status().isAccepted())
+				.andExpect(content().string("{\"value\":\"hello\"}"));
 		assertThat(this.message).isNotNull();
 		sink.input().unsubscribe(this);
 	}
@@ -70,27 +69,11 @@ public class SinkMessageChannelBinderTests implements MessageHandler {
 	public void multi() throws Exception {
 		sink.input().subscribe(this);
 		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
-				.content("[\"hello\",\"world\"]")).andExpect(status().isAccepted())
-				.andExpect(content().string(containsString("[\"hello\",\"world\"]")));
+				.content("[{\"value\":\"hello\"},{\"value\":\"world\"}]"))
+				.andExpect(status().isAccepted()).andExpect(content()
+						.string("[{\"value\":\"hello\"}, {\"value\":\"world\"}]"));
 		assertThat(this.message).isNotNull();
 		sink.input().unsubscribe(this);
-	}
-
-	@Test
-	public void string() throws Exception {
-		sink.input().subscribe(this);
-		mockMvc.perform(
-				post("/stream/input").contentType(MediaType.TEXT_PLAIN).content("hello"))
-				.andExpect(status().isAccepted())
-				.andExpect(content().string(containsString("hello")));
-		assertThat(this.message).isNotNull();
-		sink.input().unsubscribe(this);
-	}
-
-	@Test
-	public void missing() throws Exception {
-		mockMvc.perform(post("/stream/missing").contentType(MediaType.TEXT_PLAIN)
-				.content("hello")).andExpect(status().isNotFound());
 	}
 
 	@SpringBootApplication
@@ -101,6 +84,30 @@ public class SinkMessageChannelBinderTests implements MessageHandler {
 	@Override
 	public void handleMessage(Message<?> message) throws MessagingException {
 		this.message = message;
+	}
+
+	protected static class Foo {
+		private String value;
+
+		public Foo() {
+		}
+
+		public Foo(String value) {
+			this.value = value;
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+
+		public Foo toUpperCase() {
+			return new Foo(value.toUpperCase());
+		}
+
 	}
 
 }

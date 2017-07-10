@@ -95,6 +95,22 @@ public class MessageController {
 		return consumer(path, body, headers);
 	}
 
+	@PostMapping(path = "/**", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<Object> json(
+			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
+			@RequestBody String body, @RequestHeader HttpHeaders headers) {
+		return consumer(path, extract(body), headers);
+	}
+
+	private Object extract(String body) {
+		body = body.trim();
+		Object result = body;
+		if (body.startsWith("[")) {
+			result = JsonUtils.split(body);
+		}
+		return result;
+	}
+
 	@PostMapping("/**")
 	public ResponseEntity<Object> consumer(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
@@ -146,6 +162,10 @@ public class MessageController {
 				}
 				return convert(output, headers);
 			}
+		}
+		if (headers.getContentType().includes(MediaType.APPLICATION_JSON)
+				&& body.toString().contains("\"")) {
+			body = body.toString();
 		}
 		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(body)
 				.copyHeadersIfAbsent(messageHeaders).build(), headers);
