@@ -15,12 +15,15 @@
  */
 package org.springframework.cloud.stream.binder.servlet;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -42,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * @author Dave Syer
@@ -54,6 +58,8 @@ public class MessageController {
 	public static final String ROUTE_KEY = "stream_routeKey";
 
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
+
+	private ConcurrentMap<String, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
 	private Map<String, MessageChannel> inputs = new HashMap<>();
 
@@ -74,6 +80,38 @@ public class MessageController {
 		}
 		this.prefix = prefix;
 		this.bindings = bindings;
+	}
+
+	@GetMapping(path = "/**", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public ResponseEntity<SseEmitter> sse(
+			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
+			@RequestHeader HttpHeaders headers) throws IOException {
+		Route route = new Route(path);
+		String channel = route.getChannel();
+		if (!bindings.getOutputs().contains(channel)) {
+			return org.springframework.http.ResponseEntity.notFound().build();
+		}
+		Message<Collection<Object>> message = poll(route.getChannel(), route.getKey());
+		SseEmitter body = emit(route, message);
+		return ResponseEntity.ok()
+				.headers(HeaderUtils.fromMessage(message.getHeaders(), headers))
+				.body(body);
+	}
+
+	private SseEmitter emit(Route route, Message<Collection<Object>> message)
+			throws IOException {
+		SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+		String path = route.getPath();
+		if (!emitters.containsKey(path)) {
+			emitters.putIfAbsent(path, new HashSet<>());
+		}
+		emitters.get(path).add(emitter);
+		emitter.onCompletion(() -> emitters.get(path).remove(emitter));
+		emitter.onTimeout(() -> emitters.get(path).remove(emitter));
+		for (Object body : message.getPayload()) {
+			emitter.send(body);
+		}
+		return emitter;
 	}
 
 	@GetMapping("/**")
@@ -182,10 +220,10 @@ public class MessageController {
 				.body(message.getPayload());
 	}
 
-	private Message<Collection<Object>> poll(String path, String route) {
+	private Message<Collection<Object>> poll(String channel, String route) {
 		List<Object> list = new ArrayList<>();
 		List<Message<?>> messages = new ArrayList<>();
-		BlockingQueue<Message<?>> queue = queues.get(new Route(route, path).getPath());
+		BlockingQueue<Message<?>> queue = queues.get(new Route(route, channel).getPath());
 		if (queue != null) {
 			queue.drainTo(messages);
 			for (Message<?> message : messages) {
@@ -222,6 +260,16 @@ public class MessageController {
 					.build();
 		}
 		queues.get(path).add(message);
+		if (emitters.containsKey(path)) {
+			for (SseEmitter emitter : emitters.get(path)) {
+				try {
+					emitter.send(message.getPayload());
+				}
+				catch (IOException e) {
+					emitters.get(path).remove(emitter);
+				}
+			}
+		}
 	}
 
 	public void bind(String name, String group, MessageChannel inputTarget) {
@@ -244,6 +292,7 @@ public class MessageController {
 			}
 			this.channel = channel;
 			this.key = route;
+			this.path = key != null ? key + "/" + channel : channel;
 		}
 
 		public Route(String key, String channel) {

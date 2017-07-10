@@ -28,7 +28,7 @@ import org.springframework.util.ObjectUtils;
  * @author Dave Syer
  *
  */
-public class HeaderUtils {
+class HeaderUtils {
 
 	public static HttpHeaders fromMessage(MessageHeaders headers, HttpHeaders request) {
 		HttpHeaders result = new HttpHeaders();
