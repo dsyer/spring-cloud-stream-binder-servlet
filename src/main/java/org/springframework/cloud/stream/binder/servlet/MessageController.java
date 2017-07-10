@@ -51,8 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/${spring.cloud.stream.binder.servlet.prefix:stream}")
 public class MessageController {
 
-	// TODO: naming convention for "public" keys
-	public static final String ROUTE_KEY = "STREAM_ROUTE_KEY";
+	public static final String ROUTE_KEY = "stream_routeKey";
 
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
 
