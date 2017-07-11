@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -56,6 +57,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class MessageController {
 
 	public static final String ROUTE_KEY = "stream_routeKey";
+
+	private static final int BUFFER_SIZE = 100;
 
 	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
 
@@ -91,39 +94,25 @@ public class MessageController {
 		if (!bindings.getOutputs().contains(channel)) {
 			return org.springframework.http.ResponseEntity.notFound().build();
 		}
-		Message<Collection<Object>> message = poll(route.getChannel(), route.getKey());
+		Message<Collection<Object>> message = poll(route.getChannel(), route.getKey(),
+				true);
 		SseEmitter body = emit(route, message);
 		return ResponseEntity.ok()
 				.headers(HeaderUtils.fromMessage(message.getHeaders(), headers))
 				.body(body);
 	}
 
-	private SseEmitter emit(Route route, Message<Collection<Object>> message)
-			throws IOException {
-		SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-		String path = route.getPath();
-		if (!emitters.containsKey(path)) {
-			emitters.putIfAbsent(path, new HashSet<>());
-		}
-		emitters.get(path).add(emitter);
-		emitter.onCompletion(() -> emitters.get(path).remove(emitter));
-		emitter.onTimeout(() -> emitters.get(path).remove(emitter));
-		for (Object body : message.getPayload()) {
-			emitter.send(body);
-		}
-		return emitter;
-	}
-
 	@GetMapping("/**")
 	public ResponseEntity<Object> supplier(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
-			@RequestHeader HttpHeaders headers) {
+			@RequestHeader HttpHeaders headers,
+			@RequestParam(required = false) boolean purge) {
 		Route route = new Route(path);
 		String channel = route.getChannel();
 		if (!bindings.getOutputs().contains(channel)) {
 			return ResponseEntity.notFound().build();
 		}
-		return convert(poll(channel, route.getKey()), headers);
+		return convert(poll(channel, route.getKey(), !purge), headers);
 	}
 
 	@PostMapping(path = "/**", consumes = MediaType.TEXT_PLAIN_VALUE)
@@ -191,7 +180,7 @@ public class MessageController {
 		}
 		if (this.outputs.containsKey(channel)) {
 			Message<Collection<Object>> content = poll(outputs.get(channel),
-					route.getKey());
+					route.getKey(), false);
 			if (!content.getPayload().isEmpty()) {
 				Message<?> output = content;
 				if (single && content.getPayload().size() == 1) {
@@ -220,14 +209,36 @@ public class MessageController {
 				.body(message.getPayload());
 	}
 
-	private Message<Collection<Object>> poll(String channel, String route) {
+	private SseEmitter emit(Route route, Message<Collection<Object>> message)
+			throws IOException {
+		SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+		String path = route.getPath();
+		if (!emitters.containsKey(path)) {
+			emitters.putIfAbsent(path, new HashSet<>());
+		}
+		emitters.get(path).add(emitter);
+		emitter.onCompletion(() -> emitters.get(path).remove(emitter));
+		emitter.onTimeout(() -> emitters.get(path).remove(emitter));
+		for (Object body : message.getPayload()) {
+			emitter.send(body);
+		}
+		return emitter;
+	}
+
+	private Message<Collection<Object>> poll(String channel, String route,
+			boolean requeue) {
 		List<Object> list = new ArrayList<>();
 		List<Message<?>> messages = new ArrayList<>();
 		BlockingQueue<Message<?>> queue = queues.get(new Route(route, channel).getPath());
 		if (queue != null) {
 			queue.drainTo(messages);
+			int count = messages.size() - BUFFER_SIZE;
 			for (Message<?> message : messages) {
 				list.add(message.getPayload());
+				count--;
+				if (count < 0 && requeue) {
+					queue.offer(message);
+				}
 			}
 		}
 		MessageBuilder<Collection<Object>> builder = MessageBuilder.withPayload(list);
