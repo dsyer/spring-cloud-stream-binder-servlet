@@ -56,7 +56,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequestMapping("/${spring.cloud.stream.binder.servlet.prefix:stream}")
 public class MessageController {
 
-	public static final String ROUTE_KEY = "stream_routeKey";
+	public static final String ROUTE_KEY = "stream_routekey";
 
 	private static final int BUFFER_SIZE = 100;
 

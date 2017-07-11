@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -72,6 +73,13 @@ public class SseSourceMessageChannelBinderTests {
 	private int port;
 
 	private String message = null;
+
+	@Before
+	public void init() throws Exception {
+		rest.getForEntity(
+				new URI("http://localhost:" + port + "/stream/output?purge=true"),
+				String.class);
+	}
 
 	@Test
 	public void supplier() throws Exception {

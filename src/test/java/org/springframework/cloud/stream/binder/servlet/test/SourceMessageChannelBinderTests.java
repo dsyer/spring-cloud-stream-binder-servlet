@@ -59,6 +59,7 @@ public class SourceMessageChannelBinderTests {
 
 	@Test
 	public void empty() throws Exception {
+		mockMvc.perform(get("/stream/output?purge=true")).andReturn();
 		mockMvc.perform(get("/stream/output")).andExpect(status().isOk())
 				.andExpect(content().string(containsString("[]")));
 	}

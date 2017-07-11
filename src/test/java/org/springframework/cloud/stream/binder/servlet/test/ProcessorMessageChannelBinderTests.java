@@ -15,6 +15,7 @@
  */
 package org.springframework.cloud.stream.binder.servlet.test;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -55,6 +56,11 @@ public class ProcessorMessageChannelBinderTests {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Before
+	public void init() throws Exception {
+		mockMvc.perform(get("/stream/output?purge=true")).andReturn();
+	}
 
 	@Test
 	public void supplier() throws Exception {
