@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,8 +34,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.integration.core.MessagingTemplate;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.ObjectUtils;
@@ -60,19 +63,19 @@ public class MessageController {
 
 	private static final int BUFFER_SIZE = 100;
 
-	private ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
 
-	private ConcurrentMap<String, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-	private Map<String, MessageChannel> inputs = new HashMap<>();
+	private final Map<String, MessageChannel> inputs = new HashMap<>();
 
-	private Map<String, String> outputs = new HashMap<>();
+	private final Map<String, String> outputs = new HashMap<>();
 
-	private EnabledBindings bindings;
+	private final EnabledBindings bindings;
 
 	private String prefix;
 
-	private ThreadLocal<Route> threadLocalRoute = new ThreadLocal<>();
+	private final ThreadLocal<Route> threadLocalRoute = new ThreadLocal<>();
 
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
@@ -168,34 +171,50 @@ public class MessageController {
 			messageHeaders.put(ROUTE_KEY, route.getKey());
 		}
 		MessageChannel input = inputs.get(channel);
+		MessagingTemplate template = new MessagingTemplate();
+		Map<String, Object> outputHeaders = null;
+		List<Object> results = new ArrayList<>();
+		HttpStatus status = HttpStatus.ACCEPTED;
 		threadLocalRoute.set(route);
 		try {
-			for (Object payload : collection) {
-				input.send(MessageBuilder.withPayload(payload)
-						.copyHeadersIfAbsent(messageHeaders).build());
+			if (this.outputs.containsKey(channel)) {
+				for (Object payload : collection) {
+					Message<?> result = template.sendAndReceive(input, MessageBuilder
+							.withPayload(payload).copyHeadersIfAbsent(messageHeaders)
+							.setHeader(MessageHeaders.REPLY_CHANNEL, outputs.get(channel))
+							.build());
+					if (outputHeaders == null) {
+						outputHeaders = new LinkedHashMap<>(result.getHeaders());
+						outputHeaders.put(ROUTE_KEY, route.getKey());
+					}
+					results.add(result.getPayload());
+				}
+				status = HttpStatus.OK;
+			}
+			else {
+				for (Object payload : collection) {
+					template.send(input, MessageBuilder.withPayload(payload)
+							.copyHeadersIfAbsent(messageHeaders).build());
+				}
+				outputHeaders = messageHeaders;
+				results.addAll(collection);
 			}
 		}
 		finally {
 			threadLocalRoute.remove();
 		}
-		if (this.outputs.containsKey(channel)) {
-			Message<Collection<Object>> content = poll(outputs.get(channel),
-					route.getKey(), false);
-			if (!content.getPayload().isEmpty()) {
-				Message<?> output = content;
-				if (single && content.getPayload().size() == 1) {
-					output = MessageBuilder.createMessage(
-							content.getPayload().iterator().next(), content.getHeaders());
-				}
-				return convert(output, headers);
-			}
+		if (single && results.size() == 1) {
+			body = results.get(0);
+		}
+		else {
+			body = results;
 		}
 		if (headers.getContentType().includes(MediaType.APPLICATION_JSON)
 				&& body.toString().contains("\"")) {
 			body = body.toString();
 		}
-		return convert(HttpStatus.ACCEPTED, MessageBuilder.withPayload(body)
-				.copyHeadersIfAbsent(messageHeaders).build(), headers);
+		return convert(status, MessageBuilder.withPayload(body)
+				.copyHeadersIfAbsent(outputHeaders).build(), headers);
 	}
 
 	private ResponseEntity<Object> convert(Message<?> message, HttpHeaders request) {
@@ -261,14 +280,20 @@ public class MessageController {
 			// that the headers don't get propagated by default.
 			key = threadLocalRoute.get().getKey();
 		}
+		if (incoming == null && key != null) {
+			message = MessageBuilder.fromMessage(message).setHeader(ROUTE_KEY, key)
+					.build();
+		}
+		if (message.getHeaders().getReplyChannel() instanceof MessageChannel) {
+			MessageChannel replyChannel = (MessageChannel) message.getHeaders()
+					.getReplyChannel();
+			replyChannel.send(message);
+			return;
+		}
 		Route route = new Route(key, name);
 		String path = route.getPath();
 		if (!queues.containsKey(path)) {
 			queues.putIfAbsent(path, new LinkedBlockingQueue<>());
-		}
-		if (incoming == null && key != null) {
-			message = MessageBuilder.fromMessage(message).setHeader(ROUTE_KEY, key)
-					.build();
 		}
 		queues.get(path).add(message);
 		if (emitters.containsKey(path)) {
