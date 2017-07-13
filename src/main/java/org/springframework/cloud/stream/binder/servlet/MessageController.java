@@ -73,9 +73,9 @@ public class MessageController {
 
 	private final EnabledBindings bindings;
 
-	private String prefix;
+	private final MessagingTemplate template = new MessagingTemplate();
 
-	private final ThreadLocal<Route> threadLocalRoute = new ThreadLocal<>();
+	private String prefix;
 
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
@@ -86,6 +86,7 @@ public class MessageController {
 		}
 		this.prefix = prefix;
 		this.bindings = bindings;
+		this.template.setReceiveTimeout(100L);
 	}
 
 	@GetMapping(path = "/**", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -171,38 +172,46 @@ public class MessageController {
 			messageHeaders.put(ROUTE_KEY, route.getKey());
 		}
 		MessageChannel input = inputs.get(channel);
-		MessagingTemplate template = new MessagingTemplate();
 		Map<String, Object> outputHeaders = null;
 		List<Object> results = new ArrayList<>();
 		HttpStatus status = HttpStatus.ACCEPTED;
-		threadLocalRoute.set(route);
-		try {
-			if (this.outputs.containsKey(channel)) {
-				for (Object payload : collection) {
-					Message<?> result = template.sendAndReceive(input, MessageBuilder
-							.withPayload(payload).copyHeadersIfAbsent(messageHeaders)
-							.setHeader(MessageHeaders.REPLY_CHANNEL, outputs.get(channel))
-							.build());
+		// This is a total guess. We have no way to guarantee that the user will
+		// implement a Processor so that inputs always get an output, so either
+		// nothing might come back or there might be multiple outputs and we only get
+		// one of them.
+		if (this.outputs.containsKey(channel)) {
+			for (Object payload : collection) {
+				Message<?> result = template.sendAndReceive(input, MessageBuilder
+						.withPayload(payload).copyHeadersIfAbsent(messageHeaders)
+						.setHeader(MessageHeaders.REPLY_CHANNEL, outputs.get(channel))
+						.build());
+				if (result != null) {
 					if (outputHeaders == null) {
 						outputHeaders = new LinkedHashMap<>(result.getHeaders());
-						outputHeaders.put(ROUTE_KEY, route.getKey());
 					}
 					results.add(result.getPayload());
 				}
-				status = HttpStatus.OK;
 			}
-			else {
-				for (Object payload : collection) {
-					template.send(input, MessageBuilder.withPayload(payload)
-							.copyHeadersIfAbsent(messageHeaders).build());
-				}
-				outputHeaders = messageHeaders;
+			status = HttpStatus.OK;
+			if (results.isEmpty()) {
+				// If nothing came back, just assume it was intentional, and say that
+				// we accepted the inputs.
+				status = HttpStatus.ACCEPTED;
 				results.addAll(collection);
 			}
 		}
-		finally {
-			threadLocalRoute.remove();
+		else {
+			for (Object payload : collection) {
+				template.send(input, MessageBuilder.withPayload(payload)
+						.copyHeadersIfAbsent(messageHeaders).build());
+			}
+			outputHeaders = messageHeaders;
+			results.addAll(collection);
 		}
+		if (outputHeaders == null) {
+			outputHeaders = new LinkedHashMap<>();
+		}
+		outputHeaders.put(ROUTE_KEY, route.getKey());
 		if (single && results.size() == 1) {
 			body = results.get(0);
 		}
@@ -275,11 +284,6 @@ public class MessageController {
 	private void append(String name, Message<?> message) {
 		String incoming = (String) message.getHeaders().get(ROUTE_KEY);
 		String key = incoming;
-		if (key == null && threadLocalRoute.get() != null) {
-			// If we can rescue the header from thread local we will do it. It's a shame
-			// that the headers don't get propagated by default.
-			key = threadLocalRoute.get().getKey();
-		}
 		if (incoming == null && key != null) {
 			message = MessageBuilder.fromMessage(message).setHeader(ROUTE_KEY, key)
 					.build();

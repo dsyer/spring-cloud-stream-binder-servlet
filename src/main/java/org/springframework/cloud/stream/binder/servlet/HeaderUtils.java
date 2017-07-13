@@ -30,7 +30,8 @@ import org.springframework.util.ObjectUtils;
  */
 class HeaderUtils {
 
-	public static HttpHeaders fromMessage(MessageHeaders headers, HttpHeaders request) {
+	public static HttpHeaders fromMessage(Map<String, Object> headers,
+			HttpHeaders request) {
 		HttpHeaders result = new HttpHeaders();
 		for (String name : headers.keySet()) {
 			Object value = headers.get(name);
