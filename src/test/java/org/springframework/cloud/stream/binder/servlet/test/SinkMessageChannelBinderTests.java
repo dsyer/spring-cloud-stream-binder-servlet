@@ -89,8 +89,13 @@ public class SinkMessageChannelBinderTests implements MessageHandler {
 
 	@Test
 	public void missing() throws Exception {
+		sink.input().subscribe(this);
+		// It gets routed to "input" channel with key "missing"
 		mockMvc.perform(post("/stream/missing").contentType(MediaType.TEXT_PLAIN)
-				.content("hello")).andExpect(status().isNotFound());
+				.content("hello")).andExpect(status().isAccepted())
+				.andExpect(content().string(containsString("hello")));
+		assertThat(this.message).isNotNull();
+		sink.input().unsubscribe(this);
 	}
 
 	@SpringBootApplication

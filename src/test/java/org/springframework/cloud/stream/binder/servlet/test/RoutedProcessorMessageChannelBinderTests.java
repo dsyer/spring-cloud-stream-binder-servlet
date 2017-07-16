@@ -62,6 +62,14 @@ public class RoutedProcessorMessageChannelBinderTests {
 				.andExpect(content().string(containsString("HELLO")));
 	}
 
+	@Test
+	public void implicit() throws Exception {
+		mockMvc.perform(post("/stream/words").contentType(MediaType.APPLICATION_JSON)
+				.content("\"hello\"")).andExpect(status().isOk())
+				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
 	@SpringBootApplication
 	@EnableBinding(Processor.class)
 	protected static class TestConfiguration {

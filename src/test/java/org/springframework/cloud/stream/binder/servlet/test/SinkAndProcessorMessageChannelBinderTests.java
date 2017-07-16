@@ -35,6 +35,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -57,6 +58,7 @@ public class SinkAndProcessorMessageChannelBinderTests {
 
 	@Test
 	public void function() throws Exception {
+		mockMvc.perform(get("/stream/output?purge=true")).andReturn();
 		mockMvc.perform(post("/stream/words/input")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isOk())
@@ -65,6 +67,7 @@ public class SinkAndProcessorMessageChannelBinderTests {
 
 	@Test
 	public void consumer() throws Exception {
+		mockMvc.perform(get("/stream/output?purge=true")).andReturn();
 		mockMvc.perform(post("/stream/accept/input")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isAccepted())

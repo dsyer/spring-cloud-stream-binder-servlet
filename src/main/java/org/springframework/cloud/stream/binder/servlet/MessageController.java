@@ -93,7 +93,7 @@ public class MessageController {
 	public ResponseEntity<SseEmitter> sse(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestHeader HttpHeaders headers) throws IOException {
-		Route route = new Route(path);
+		Route route = output(path);
 		String channel = route.getChannel();
 		if (!bindings.getOutputs().contains(channel)) {
 			return org.springframework.http.ResponseEntity.notFound().build();
@@ -111,7 +111,7 @@ public class MessageController {
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestHeader HttpHeaders headers,
 			@RequestParam(required = false) boolean purge) {
-		Route route = new Route(path);
+		Route route = output(path);
 		String channel = route.getChannel();
 		if (!bindings.getOutputs().contains(channel)) {
 			return ResponseEntity.notFound().build();
@@ -123,14 +123,14 @@ public class MessageController {
 	public ResponseEntity<Object> string(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody String body, @RequestHeader HttpHeaders headers) {
-		return consumer(path, body, headers);
+		return function(path, body, headers);
 	}
 
 	@PostMapping(path = "/**", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<Object> json(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody String body, @RequestHeader HttpHeaders headers) {
-		return consumer(path, extract(body), headers);
+		return function(path, extract(body), headers);
 	}
 
 	private Object extract(String body) {
@@ -143,10 +143,10 @@ public class MessageController {
 	}
 
 	@PostMapping("/**")
-	public ResponseEntity<Object> consumer(
+	public ResponseEntity<Object> function(
 			@RequestAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping") String path,
 			@RequestBody Object body, @RequestHeader HttpHeaders headers) {
-		Route route = new Route(path);
+		Route route = input(path);
 		String channel = route.getChannel();
 		if (!inputs.containsKey(channel)) {
 			return ResponseEntity.notFound().build();
@@ -316,19 +316,52 @@ public class MessageController {
 		this.inputs.put(name, inputTarget);
 	}
 
+	public Route output(String path) {
+		return new Route(prefix, path,
+				bindings.getOutputs().size() == 1
+						? bindings.getOutputs().iterator().next()
+						: "output");
+	}
+
+	public Route input(String path) {
+		return new Route(prefix, path,
+				bindings.getInputs().size() == 1 ? bindings.getInputs().iterator().next()
+						: "input");
+	}
+
 	private class Route {
 		private String key;
 		private String channel;
 		private String path;
 
-		public Route(String path) {
-			String channel = path.substring(prefix.length());
-			String[] paths = channel.split("/");
+		private Route(String prefix, String path, String defaultChannel) {
+			String channel;
 			String route = null;
-			if (paths.length > 1) {
-				channel = paths[paths.length - 1];
-				route = path.substring(prefix.length(),
-						path.length() - channel.length() - 1);
+			if (path.endsWith("/" + defaultChannel)) {
+				channel = defaultChannel;
+				if (path.length() > prefix.length() + channel.length()) {
+					route = path.substring(prefix.length(),
+							path.length() - channel.length() - 1);
+				}
+			}
+			else {
+				if (path.length() > prefix.length()) {
+					channel = path.substring(prefix.length());
+					String[] paths = channel.split("/");
+					if (paths.length > 1) {
+						channel = paths[paths.length - 1];
+						route = path.substring(prefix.length(),
+								path.length() - channel.length() - 1);
+					}
+				}
+				else {
+					channel = defaultChannel;
+				}
+				if (!bindings.getInputs().contains(channel)
+						& !bindings.getOutputs().contains(channel)) {
+					channel = defaultChannel;
+					route = path.substring(prefix.length());
+				}
 			}
 			this.channel = channel;
 			this.key = route;

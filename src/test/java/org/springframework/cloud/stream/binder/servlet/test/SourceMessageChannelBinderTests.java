@@ -58,6 +58,20 @@ public class SourceMessageChannelBinderTests {
 	}
 
 	@Test
+	public void implicit() throws Exception {
+		source.output().send(MessageBuilder.withPayload("hello").build());
+		mockMvc.perform(get("/stream")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("hello")));
+	}
+
+	@Test
+	public void trailing() throws Exception {
+		source.output().send(MessageBuilder.withPayload("hello").build());
+		mockMvc.perform(get("/stream/")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("hello")));
+	}
+
+	@Test
 	public void empty() throws Exception {
 		mockMvc.perform(get("/stream/output?purge=true")).andReturn();
 		mockMvc.perform(get("/stream/output")).andExpect(status().isOk())
@@ -66,7 +80,9 @@ public class SourceMessageChannelBinderTests {
 
 	@Test
 	public void missing() throws Exception {
-		mockMvc.perform(get("/stream/missing")).andExpect(status().isNotFound());
+		// Missing route is just empty
+		mockMvc.perform(get("/stream/missing")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("[]")));
 	}
 
 	@SpringBootApplication
