@@ -337,31 +337,28 @@ public class MessageController {
 		private Route(String prefix, String path, String defaultChannel) {
 			String channel;
 			String route = null;
-			if (path.endsWith("/" + defaultChannel)) {
-				channel = defaultChannel;
-				if (path.length() > prefix.length() + channel.length()) {
-					route = path.substring(prefix.length(),
-							path.length() - channel.length() - 1);
-				}
+			// Strip the prefix first
+			if (path.length() > prefix.length()) {
+				path = path.substring(prefix.length());
 			}
 			else {
-				if (path.length() > prefix.length()) {
-					channel = path.substring(prefix.length());
-					String[] paths = channel.split("/");
-					if (paths.length > 1) {
-						channel = paths[paths.length - 1];
-						route = path.substring(prefix.length(),
-								path.length() - channel.length() - 1);
-					}
-				}
-				else {
-					channel = defaultChannel;
-				}
-				if (!bindings.getInputs().contains(channel)
-						& !bindings.getOutputs().contains(channel)) {
-					channel = defaultChannel;
-					route = path.substring(prefix.length());
-				}
+				path = "";
+			}
+			// Then extract the last segment of the path, and call it a "channel"
+			String[] paths = path.split("/");
+			if (paths.length > 1) {
+				channel = paths[paths.length - 1];
+				route = path.substring(0, path.length() - channel.length() - 1);
+			}
+			else {
+				channel = path;
+			}
+			// If it's not actually a channel we know about, use the default, and call the
+			// whole path a "route"
+			if (!bindings.getInputs().contains(channel)
+					& !bindings.getOutputs().contains(channel)) {
+				channel = defaultChannel;
+				route = path.length() > 0 ? path : null;
 			}
 			this.channel = channel;
 			this.key = route;
