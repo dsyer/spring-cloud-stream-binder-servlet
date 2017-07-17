@@ -16,6 +16,7 @@
 package org.springframework.cloud.stream.binder.servlet;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,10 +26,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingQueue;
+
+import org.reactivestreams.Processor;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -51,6 +52,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.UnicastProcessor;
+
 /**
  * @author Dave Syer
  *
@@ -61,9 +65,7 @@ public class MessageController {
 
 	public static final String ROUTE_KEY = "stream_routekey";
 
-	private static final int BUFFER_SIZE = 100;
-
-	private final ConcurrentMap<String, BlockingQueue<Message<?>>> queues = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, Bridge<Message<?>>> queues = new ConcurrentHashMap<>();
 
 	private final ConcurrentMap<String, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -77,6 +79,8 @@ public class MessageController {
 
 	private String prefix;
 
+	public long timeoutSeconds = 10;
+
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
 			prefix = "/" + prefix;
@@ -87,6 +91,10 @@ public class MessageController {
 		this.prefix = prefix;
 		this.bindings = bindings;
 		this.template.setReceiveTimeout(100L);
+	}
+
+	public void setTimeoutSeconds(long timeoutSeconds) {
+		this.timeoutSeconds = timeoutSeconds;
 	}
 
 	@GetMapping(path = "/**", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -257,16 +265,14 @@ public class MessageController {
 			boolean requeue) {
 		List<Object> list = new ArrayList<>();
 		List<Message<?>> messages = new ArrayList<>();
-		BlockingQueue<Message<?>> queue = queues.get(new Route(route, channel).getPath());
+		Bridge<Message<?>> queue = queues.get(new Route(route, channel).getPath());
 		if (queue != null) {
-			queue.drainTo(messages);
-			int count = messages.size() - BUFFER_SIZE;
-			for (Message<?> message : messages) {
+			queue.receive().subscribe(message -> {
+				messages.add(message);
 				list.add(message.getPayload());
-				count--;
-				if (count < 0 && requeue) {
-					queue.offer(message);
-				}
+			});
+			if (!requeue) {
+				queue.reset();
 			}
 		}
 		MessageBuilder<Collection<Object>> builder = MessageBuilder.withPayload(list);
@@ -297,9 +303,10 @@ public class MessageController {
 		Route route = new Route(key, name);
 		String path = route.getPath();
 		if (!queues.containsKey(path)) {
-			queues.putIfAbsent(path, new LinkedBlockingQueue<>());
+			Bridge<Message<?>> flux = new Bridge<>();
+			queues.putIfAbsent(path, flux);
 		}
-		queues.get(path).add(message);
+		queues.get(path).send(message);
 		if (emitters.containsKey(path)) {
 			for (SseEmitter emitter : emitters.get(path)) {
 				try {
@@ -383,4 +390,29 @@ public class MessageController {
 			return channel;
 		}
 	}
+
+	private class Bridge<T> {
+
+		private Processor<T, T> emitter;
+		private Flux<T> sink;
+
+		public Bridge() {
+			reset();
+		}
+
+		public void reset() {
+			this.emitter = UnicastProcessor.<T>create().serialize();
+			this.sink = Flux.from(emitter).replay().autoConnect()
+					.take(Duration.ofSeconds(timeoutSeconds));
+		}
+
+		public void send(T item) {
+			emitter.onNext(item);
+		}
+
+		public Flux<T> receive() {
+			return sink;
+		}
+	}
+
 }
