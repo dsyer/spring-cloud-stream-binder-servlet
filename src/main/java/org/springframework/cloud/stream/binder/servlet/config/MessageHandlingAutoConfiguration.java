@@ -39,6 +39,11 @@ public class MessageHandlingAutoConfiguration {
 	 */
 	private String prefix = "stream";
 
+	/**
+	 * The buffer timeout for messages sent to output channels, and accessed via GET.
+	 */
+	private long timeoutSeconds = 10;
+
 	public String getPrefix() {
 		return prefix;
 	}
@@ -47,9 +52,19 @@ public class MessageHandlingAutoConfiguration {
 		this.prefix = prefix;
 	}
 
+	public long getTimeoutSeconds() {
+		return timeoutSeconds;
+	}
+
+	public void setTimeoutSeconds(long timeoutSeconds) {
+		this.timeoutSeconds = timeoutSeconds;
+	}
+
 	@Bean
 	public MessageController messageController(EnabledBindings bindings) {
-		return new MessageController(prefix, bindings);
+		MessageController controller = new MessageController(prefix, bindings);
+		controller.setTimeoutSeconds(timeoutSeconds);
+		return controller;
 	}
 
 	@Bean

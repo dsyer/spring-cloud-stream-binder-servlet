@@ -59,6 +59,14 @@ public class RoutedSourceMessageChannelBinderTests {
 				.andExpect(content().string(containsString("hello")));
 	}
 
+	@Test
+	public void implicit() throws Exception {
+		source.output().send(MessageBuilder.withPayload("hello")
+				.setHeader(MessageController.ROUTE_KEY, "words").build());
+		mockMvc.perform(get("/stream/words")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("hello")));
+	}
+
 	@SpringBootApplication
 	@EnableBinding(Source.class)
 	protected static class TestConfiguration {

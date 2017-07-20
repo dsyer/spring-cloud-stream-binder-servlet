@@ -25,6 +25,7 @@ import org.springframework.messaging.handler.invocation.InvocableHandlerMethod;
  * @author Marius Bogoevici
  * @since 1.2
  */
+// TODO: remove this when it is possible to transmit headers in Spring Cloud Stream core
 public class StreamListenerMessageHandler extends AbstractReplyProducingMessageHandler {
 
 	private final InvocableHandlerMethod invocableHandlerMethod;
