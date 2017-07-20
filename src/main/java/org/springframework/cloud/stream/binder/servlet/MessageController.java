@@ -363,11 +363,11 @@ public class MessageController {
 			else {
 				path = "";
 			}
-			// Then extract the last segment of the path, and call it a "channel"
+			// Then extract the first segment of the path, and call it a "channel"
 			String[] paths = path.split("/");
 			if (paths.length > 1) {
-				channel = paths[paths.length - 1];
-				route = path.substring(0, path.length() - channel.length() - 1);
+				channel = paths[0];
+				route = path.substring(channel.length() + 1, path.length());
 			}
 			else {
 				channel = path;

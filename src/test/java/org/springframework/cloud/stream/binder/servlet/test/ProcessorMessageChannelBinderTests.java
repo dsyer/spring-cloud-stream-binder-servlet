@@ -70,6 +70,21 @@ public class ProcessorMessageChannelBinderTests {
 	}
 
 	@Test
+	public void missing() throws Exception {
+		// Missing route is not found if channel is explicit
+		mockMvc.perform(get("/stream/output/missing")).andExpect(status().isNotFound())
+				.andExpect(content().string(equalTo("")));
+	}
+
+	@Test
+	public void empty() throws Exception {
+		// Missing route where channel can be inferred (there is an input channel) is
+		// going to be passed on as a body
+		mockMvc.perform(get("/stream/missing")).andExpect(status().isOk())
+				.andExpect(content().string(equalTo("MISSING")));
+	}
+
+	@Test
 	public void function() throws Exception {
 		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
 				.content("\"hello\"")).andExpect(status().isOk())

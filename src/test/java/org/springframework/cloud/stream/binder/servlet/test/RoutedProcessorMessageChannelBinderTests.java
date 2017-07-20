@@ -56,7 +56,7 @@ public class RoutedProcessorMessageChannelBinderTests {
 
 	@Test
 	public void function() throws Exception {
-		mockMvc.perform(post("/stream/words/input")
+		mockMvc.perform(post("/stream/input/words")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isOk())
 				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
@@ -72,7 +72,7 @@ public class RoutedProcessorMessageChannelBinderTests {
 
 	@Test
 	public void channelAndKeyed() throws Exception {
-		mockMvc.perform(get("/stream/words/hello/input")).andExpect(status().isOk())
+		mockMvc.perform(get("/stream/input/words/hello")).andExpect(status().isOk())
 				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
 				.andExpect(content().string(containsString("HELLO")));
 	}

@@ -60,7 +60,7 @@ public class RoutedSinkMessageChannelBinderTests implements MessageHandler {
 	@Test
 	public void consumer() throws Exception {
 		sink.input().subscribe(this);
-		mockMvc.perform(post("/stream/words/input")
+		mockMvc.perform(post("/stream/input/words")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isAccepted())
 				.andExpect(content().string(containsString("hello")));

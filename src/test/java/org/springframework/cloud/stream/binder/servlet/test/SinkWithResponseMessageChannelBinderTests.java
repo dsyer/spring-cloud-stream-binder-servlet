@@ -52,7 +52,7 @@ public class SinkWithResponseMessageChannelBinderTests {
 
 	@Test
 	public void function() throws Exception {
-		mockMvc.perform(post("/stream/words/input")
+		mockMvc.perform(post("/stream/input/words")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("HELLO")));

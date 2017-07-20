@@ -55,7 +55,7 @@ public class RoutedSourceMessageChannelBinderTests {
 	public void supplier() throws Exception {
 		source.output().send(MessageBuilder.withPayload("hello")
 				.setHeader(MessageController.ROUTE_KEY, "words").build());
-		mockMvc.perform(get("/stream/words/output")).andExpect(status().isOk())
+		mockMvc.perform(get("/stream/output/words")).andExpect(status().isOk())
 				.andExpect(content().string(containsString("hello")));
 	}
 
