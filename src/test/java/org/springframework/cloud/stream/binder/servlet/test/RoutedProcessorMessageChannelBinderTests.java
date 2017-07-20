@@ -35,6 +35,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -58,6 +59,20 @@ public class RoutedProcessorMessageChannelBinderTests {
 		mockMvc.perform(post("/stream/words/input")
 				.contentType(MediaType.APPLICATION_JSON).content("\"hello\""))
 				.andExpect(status().isOk())
+				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
+	@Test
+	public void keyed() throws Exception {
+		mockMvc.perform(get("/stream/words/hello")).andExpect(status().isOk())
+				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
+	@Test
+	public void channelAndKeyed() throws Exception {
+		mockMvc.perform(get("/stream/words/hello/input")).andExpect(status().isOk())
 				.andExpect(header().string(MessageController.ROUTE_KEY, "words"))
 				.andExpect(content().string(containsString("HELLO")));
 	}

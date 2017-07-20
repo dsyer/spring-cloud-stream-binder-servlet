@@ -121,10 +121,21 @@ public class MessageController {
 			@RequestParam(required = false) boolean purge) {
 		Route route = output(path);
 		String channel = route.getChannel();
-		if (!bindings.getOutputs().contains(channel)) {
+		if (bindings.getOutputs().contains(channel)) {
+			Message<Collection<Object>> polled = poll(channel, route.getKey(), !purge);
+			if (!polled.getPayload().isEmpty() || route.getKey() == null) {
+				return convert(polled, headers);
+			}
+		}
+		route = input(path);
+		channel = route.getChannel();
+		if (!bindings.getInputs().contains(channel)) {
 			return ResponseEntity.notFound().build();
 		}
-		return convert(poll(channel, route.getKey(), !purge), headers);
+		String body = route.getKey();
+		body = body.contains("/") ? body.substring(body.lastIndexOf("/") + 1) : body;
+		path = path.replaceAll("/" + body, "");
+		return string(path, body, headers);
 	}
 
 	@PostMapping(path = "/**", consumes = MediaType.TEXT_PLAIN_VALUE)
@@ -226,7 +237,8 @@ public class MessageController {
 		else {
 			body = results;
 		}
-		if (headers.getContentType().includes(MediaType.APPLICATION_JSON)
+		if (headers.getContentType() != null
+				&& headers.getContentType().includes(MediaType.APPLICATION_JSON)
 				&& body.toString().contains("\"")) {
 			body = body.toString();
 		}

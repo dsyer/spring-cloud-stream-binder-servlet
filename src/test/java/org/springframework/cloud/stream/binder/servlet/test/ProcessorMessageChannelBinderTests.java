@@ -77,6 +77,12 @@ public class ProcessorMessageChannelBinderTests {
 	}
 
 	@Test
+	public void keyed() throws Exception {
+		mockMvc.perform(get("/stream/hello")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
+	@Test
 	public void implicit() throws Exception {
 		mockMvc.perform(post("/stream").contentType(MediaType.APPLICATION_JSON)
 				.content("\"hello\"")).andExpect(status().isOk())

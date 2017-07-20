@@ -29,6 +29,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -81,8 +82,8 @@ public class SourceMessageChannelBinderTests {
 	@Test
 	public void missing() throws Exception {
 		// Missing route is just empty
-		mockMvc.perform(get("/stream/missing")).andExpect(status().isOk())
-				.andExpect(content().string(containsString("[]")));
+		mockMvc.perform(get("/stream/missing")).andExpect(status().isNotFound())
+				.andExpect(content().string(equalTo("")));
 	}
 
 	@SpringBootApplication
