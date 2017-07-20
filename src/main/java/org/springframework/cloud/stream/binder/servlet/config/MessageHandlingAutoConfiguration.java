@@ -42,7 +42,13 @@ public class MessageHandlingAutoConfiguration {
 	/**
 	 * The buffer timeout for messages sent to output channels, and accessed via GET.
 	 */
-	private long timeoutSeconds = 10;
+	private long bufferTimeoutSeconds = 10;
+
+	/**
+	 * The receive timeout for messages in a send-and-receive from a linked output via
+	 * POST.
+	 */
+	private long receiveTimeoutMillis = 100;
 
 	public String getPrefix() {
 		return prefix;
@@ -52,18 +58,27 @@ public class MessageHandlingAutoConfiguration {
 		this.prefix = prefix;
 	}
 
-	public long getTimeoutSeconds() {
-		return timeoutSeconds;
+	public long getBufferTimeoutSeconds() {
+		return bufferTimeoutSeconds;
 	}
 
-	public void setTimeoutSeconds(long timeoutSeconds) {
-		this.timeoutSeconds = timeoutSeconds;
+	public void setBufferTimeoutSeconds(long bufferTimeoutSeconds) {
+		this.bufferTimeoutSeconds = bufferTimeoutSeconds;
+	}
+
+	public long getReceiveTimeoutMillis() {
+		return receiveTimeoutMillis;
+	}
+
+	public void setReceiveTimeoutMillis(long receiveTimeoutMillis) {
+		this.receiveTimeoutMillis = receiveTimeoutMillis;
 	}
 
 	@Bean
 	public MessageController messageController(EnabledBindings bindings) {
 		MessageController controller = new MessageController(prefix, bindings);
-		controller.setTimeoutSeconds(timeoutSeconds);
+		controller.setBufferTimeoutSeconds(bufferTimeoutSeconds);
+		controller.setReceiveTimeoutSeconds(receiveTimeoutMillis);
 		return controller;
 	}
 

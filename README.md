@@ -35,4 +35,5 @@ Configuration properties (in addition to the ones provided by Spring Cloud Strea
 | Key                            | Default | Description                |
 |--------------------------------|---------|----------------------------|
 | `spring.cloud.stream.binder.servlet.prefix`         | `stream` | The prefix for the URL paths |
-| `spring.cloud.stream.binder.servlet.timeoutSeconds` | 10 | The buffer size in seconds to store messages from the output channels. |
+| `spring.cloud.stream.binder.servlet.buffer-timeout-seconds` | 10 | The buffer size in seconds to store messages from the output channels. |
+| `spring.cloud.stream.binder.servlet.receive-timeout-millis` | 100 | The timeout for send and receive if POST has a linked output channel. Only relevant if the message processing is asynchronous. |

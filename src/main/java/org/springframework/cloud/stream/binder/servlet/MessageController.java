@@ -81,6 +81,8 @@ public class MessageController {
 
 	public long timeoutSeconds = 10;
 
+	private long receiveTimeoutMillis;
+
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
 			prefix = "/" + prefix;
@@ -90,10 +92,15 @@ public class MessageController {
 		}
 		this.prefix = prefix;
 		this.bindings = bindings;
-		this.template.setReceiveTimeout(100L);
+		this.template.setReceiveTimeout(this.receiveTimeoutMillis);
 	}
 
-	public void setTimeoutSeconds(long timeoutSeconds) {
+	public void setReceiveTimeoutSeconds(long receiveTimeoutMillis) {
+		this.receiveTimeoutMillis = receiveTimeoutMillis;
+		this.template.setReceiveTimeout(receiveTimeoutMillis);
+	}
+
+	public void setBufferTimeoutSeconds(long timeoutSeconds) {
 		this.timeoutSeconds = timeoutSeconds;
 	}
 
