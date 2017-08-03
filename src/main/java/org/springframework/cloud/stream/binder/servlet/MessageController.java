@@ -307,12 +307,7 @@ public class MessageController {
 	}
 
 	private void append(String name, Message<?> message) {
-		String incoming = (String) message.getHeaders().get(ROUTE_KEY);
-		String key = incoming;
-		if (incoming == null && key != null) {
-			message = MessageBuilder.fromMessage(message).setHeader(ROUTE_KEY, key)
-					.build();
-		}
+		String key = (String) message.getHeaders().get(ROUTE_KEY);
 		if (message.getHeaders().getReplyChannel() instanceof MessageChannel) {
 			MessageChannel replyChannel = (MessageChannel) message.getHeaders()
 					.getReplyChannel();
