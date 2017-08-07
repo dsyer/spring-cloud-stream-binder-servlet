@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest
+@SpringBootTest(properties = "logging.level.org.springframework.web=DEBUG")
 @AutoConfigureMockMvc
 @DirtiesContext
 public class PojoProcessorMessageChannelBinderTests {
@@ -50,8 +50,22 @@ public class PojoProcessorMessageChannelBinderTests {
 	private MockMvc mockMvc;
 
 	@Test
-	public void function() throws Exception {
-		mockMvc.perform(post("/stream/input").contentType(MediaType.APPLICATION_JSON)
+	public void json() throws Exception {
+		mockMvc.perform(post("/stream").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"value\":\"hello\"}")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
+	@Test
+	public void text() throws Exception {
+		mockMvc.perform(post("/stream").contentType(MediaType.TEXT_PLAIN)
+				.content("[{\"value\":\"hello\"}]")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("HELLO")));
+	}
+
+	@Test
+	public void single() throws Exception {
+		mockMvc.perform(post("/stream").contentType(MediaType.TEXT_PLAIN)
 				.content("{\"value\":\"hello\"}")).andExpect(status().isOk())
 				.andExpect(content().string(containsString("HELLO")));
 	}

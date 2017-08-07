@@ -183,6 +183,9 @@ public class MessageController {
 		}
 		Collection<Object> collection;
 		boolean single = false;
+		if (body instanceof String) {
+			body = extract((String) body);
+		}
 		if (body instanceof Collection) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> list = (Collection<Object>) body;
