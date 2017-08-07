@@ -16,12 +16,16 @@
 
 package org.springframework.cloud.stream.binder.servlet.config;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.stream.binder.servlet.EnabledBindings;
 import org.springframework.cloud.stream.binder.servlet.MessageController;
+import org.springframework.cloud.stream.binder.servlet.RouteRegistry;
 import org.springframework.cloud.stream.config.BindingServiceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -75,10 +79,16 @@ public class MessageHandlingAutoConfiguration {
 	}
 
 	@Bean
-	public MessageController messageController(EnabledBindings bindings) {
+	public MessageController messageController(EnabledBindings bindings,
+			@Autowired(required = false) List<RouteRegistry> registries) {
 		MessageController controller = new MessageController(prefix, bindings);
 		controller.setBufferTimeoutSeconds(bufferTimeoutSeconds);
 		controller.setReceiveTimeoutSeconds(receiveTimeoutMillis);
+		if (registries != null) {
+			for (RouteRegistry registry : registries) {
+				controller.registerRoutes(registry.routes());
+			}
+		}
 		return controller;
 	}
 

@@ -18,6 +18,7 @@
 	<properties>
 		<reactor.version>3.0.7.RELEASE</reactor.version>
 		<java.version>1.8</java.version>
+		<function.version>1.0.0.BUILD-SNAPSHOT</function.version>
 	</properties>
 
 	<dependencies>
@@ -46,6 +47,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-function-context</artifactId>
+			<version>${function.version}</version>
+			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -117,7 +124,7 @@
 			<dependency>
 				<groupId>org.springframework.cloud</groupId>
 				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>Dalston.SR1</version>
+				<version>Dalston.SR2</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

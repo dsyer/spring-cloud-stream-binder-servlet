@@ -18,8 +18,19 @@ package org.springframework.cloud.stream.binder.servlet;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Internal convenience class to help with JSON message bodies. In particular translating
+ * between JSON arrays and lists of payloads.
+ * 
+ * @author Dave Syer
+ *
+ */
 class JsonUtils {
 
+	/**
+	 * Split a JSON array into a list of individual objects, without parsing the objects
+	 * themselves..
+	 */
 	public static List<String> split(String body) {
 		body = body.trim();
 		// it's an array

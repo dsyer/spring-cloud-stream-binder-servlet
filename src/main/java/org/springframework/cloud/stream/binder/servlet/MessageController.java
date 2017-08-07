@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,6 +84,8 @@ public class MessageController {
 
 	private long receiveTimeoutMillis;
 
+	private Set<String> routes = new LinkedHashSet<>();
+
 	public MessageController(String prefix, EnabledBindings bindings) {
 		if (!prefix.startsWith("/")) {
 			prefix = "/" + prefix;
@@ -130,7 +133,8 @@ public class MessageController {
 		String channel = route.getChannel();
 		if (bindings.getOutputs().contains(channel)) {
 			Message<Collection<Object>> polled = poll(channel, route.getKey(), !purge);
-			if (!polled.getPayload().isEmpty() || route.getKey() == null) {
+			if (routes.contains(route.getKey()) || !polled.getPayload().isEmpty()
+					|| route.getKey() == null) {
 				return convert(polled, headers);
 			}
 		}
@@ -322,7 +326,8 @@ public class MessageController {
 		}
 		queues.get(path).send(message);
 		if (emitters.containsKey(path)) {
-			for (SseEmitter emitter : emitters.get(path)) {
+			Set<SseEmitter> list = new HashSet<>(emitters.get(path));
+			for (SseEmitter emitter : list) {
 				try {
 					emitter.send(message.getPayload());
 				}
@@ -427,6 +432,10 @@ public class MessageController {
 		public Flux<T> receive() {
 			return sink;
 		}
+	}
+
+	public void registerRoutes(Set<String> routes) {
+		this.routes.addAll(routes);
 	}
 
 }
