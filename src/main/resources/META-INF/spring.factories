@@ -1,3 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-org.springframework.cloud.stream.binder.servlet.config.MessageHandlingAutoConfiguration,\
-org.springframework.cloud.stream.binder.servlet.config.RouteRegistryAutoConfiguration
+org.springframework.cloud.stream.binder.servlet.config.MessageHandlingAutoConfiguration

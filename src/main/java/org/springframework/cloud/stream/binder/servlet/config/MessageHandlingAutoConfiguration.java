@@ -21,6 +21,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.stream.binder.servlet.EnabledBindings;
@@ -36,6 +37,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @AutoConfigureBefore({ WebMvcAutoConfiguration.class })
 @ConfigurationProperties("spring.cloud.stream.binder.servlet")
+@ConditionalOnProperty(name = "spring.cloud.stream.enabled", havingValue = "true", matchIfMissing = true)
 public class MessageHandlingAutoConfiguration {
 
 	/**

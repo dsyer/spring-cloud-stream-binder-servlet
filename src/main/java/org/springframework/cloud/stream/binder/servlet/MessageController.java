@@ -62,7 +62,7 @@ import reactor.core.publisher.UnicastProcessor;
  */
 @RestController
 @RequestMapping("/${spring.cloud.stream.binder.servlet.prefix:stream}")
-public class MessageController {
+public class MessageController implements RouteRegistrar {
 
 	public static final String ROUTE_KEY = "stream_routekey";
 
@@ -437,8 +437,17 @@ public class MessageController {
 		}
 	}
 
+	@Override
 	public void registerRoutes(Set<String> routes) {
 		this.routes.addAll(routes);
+	}
+
+	@Override
+	public void unregisterRoutes(Set<String> routes) {
+		this.routes.removeAll(routes);
+		for (String path : routes) {
+			queues.remove(output(prefix + path).getPath());
+		}
 	}
 
 }
